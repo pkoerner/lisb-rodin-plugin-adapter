@@ -1,14 +1,18 @@
 (ns lisb-rodin-plugin-adapter.core
   (:require [lisb.prob.animator :refer [api injector eval-formula']]
             [lisb.translation.eventb.util :as util]
+            [lisb.translation.util :as butil]
             [lisb.translation.irtools :as irtools]
             [lisb.translation.eventb.irtools :as irt])
+  (:import [de.prob.animator.command FindStateCommand]
+           [de.prob.animator.domainobjects ClassicalB]
+           [de.prob.animator.domainobjects FormulaExpand])
   (:gen-class
     :name de.hhu.stups.lisb.RodinPluginAdapter
     :methods [^{:static true} [getStateSpace [String] de.prob.statespace.StateSpace]
               ;; File -> StateSpace (loaded model)
 
-              ^{:static true} [getIR [StateSpace String] java.util.Map]
+              ^{:static true} [getIR [de.prob.statespace.StateSpace String] java.util.Map]
               ;; StateSpace + MachineName / ContextName -> IR
 
               ^{:static true} [getLabeledPredicates [java.util.Map] java.util.Map]
@@ -46,12 +50,30 @@
   ;; TODO: collect all identifiers which are not local or constants
   )
 
-(defn -evaluatePredicate [ir bindings]
-  ()
-  nil)
+(defn -evaluatePredicate [statespace ir bindings]
+  ;; TODO: this is basically the evaluation mechanism in lisb --- refactor!
+  (let [formula (apply butil/band (map (fn [[id v]] (butil/b= (keyword id) (butil/b-expression->ir v))) bindings))
+        formula-str (butil/ir->b formula)
+        ;_ (println formula-str)
+        fsc (FindStateCommand. statespace (ClassicalB. (butil/b-predicate->ast formula-str) FormulaExpand/EXPAND "") false)
+        _ (.execute statespace fsc)
+        newstate (.getDestination (.getOperation fsc))
+        ;; include bindings in solution for post-variables
+        res (.eval newstate (butil/ir->b (butil/band formula ir)))]
+    ;; TODO: handle res
+    res))
 
-(defn -evaluateAction [ir bindings]
-  nil)
+(defn -getWrittenVariables [ir]
+  (let [parts (partition 2 (:id-vals ir))]
+    (map first parts)))
+
+(defn -evaluateAction [statespace ir bindings]
+  (let [parts (partition 2 (:id-vals ir))
+        ids (map first parts)
+        vs (map second parts)]
+    (-evaluatePredicate statespace
+                        (apply butil/band (map (fn [id v] (butil/b= (keyword (str "lisb__postsubst__" (name id))) v)) ids vs))
+                        bindings)))
 
 (comment
   (def statespace (-getStateSpace "/home/philipp/tmp/rodin/workspace/NewProject/Clock.bum"))
@@ -64,4 +86,21 @@
   (filter #(= (name (:name %)) "ClockDeepInstance") (first (util/lisb->ir (util/prob->lisb (.getModel statespace)))))
   (require 'lisb.translation.lisb2ir)
   (eval-formula' statespace (lisb.translation.util/ir->ast (lisb.translation.lisb2ir/b= :mm 1)))
+
+  (def statespace (-getStateSpace "/home/philipp/tmp/drohnen-projekt/EventB_Model/Projekt/Drone_Emergency.bum"))
+  (def ir (-getIR statespace "Drone_Emergency"))
+  ir
+  (def preds (-getLabeledPredicates ir) )
+  (-getOpenIdentifiers nil (get-in preds ["take_off" ""]))
+
+  (eval-formula' statespace (lisb.translation.util/ir->ast (lisb.translation.lisb2ir/b= :z 1)))
+
+  (def fsc (FindStateCommand. statespace (ClassicalB. (butil/b-predicate->ast "z=1 & TAKE_OFF_DIST = 2 & Z_RAN = 1..2") FormulaExpand/EXPAND "") false))
+  (.execute statespace fsc)
+  (def newstate (.getDestination (.getOperation fsc)))
+  (.eval newstate (butil/ir->b (get-in preds ["take_off" "z_ran"])))
+  preds
+
+  (-evaluatePredicate statespace (get-in preds ["take_off" "z_ran"]) {"z" "1", "TAKE_OFF_DIST" "2", "Z_RAN" "1..3"})
+  (-evaluateAction statespace (get-in preds ["take_off" "estimante_z"]) {"z" "1", "TAKE_OFF_DIST" "2", "lisb__postsubst__z" "3"})
   )
