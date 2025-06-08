@@ -6,7 +6,8 @@
             [lisb.translation.eventb.irtools :as irt])
   (:import [de.prob.animator.command FindStateCommand]
            [de.prob.animator.domainobjects ClassicalB]
-           [de.prob.animator.domainobjects FormulaExpand])
+           [de.prob.animator.domainobjects FormulaExpand]
+           [java.util.concurrent.TimeoutException])
   (:gen-class
     :name de.hhu.stups.lisb.RodinPluginAdapter
     :methods [^{:static true} [getStateSpace [String] de.prob.statespace.StateSpace]
@@ -59,15 +60,19 @@
         _ (.execute statespace fsc)
         newstate (.getDestination (.getOperation fsc))
         ;; include bindings in solution for post-variables
-        res (.eval newstate (butil/ir->b (butil/band formula ir)))]
+        res (.eval newstate (butil/ir->b (butil/band formula ir)))
+        res-val (.getValue res)]
     ;; TODO: handle res
-    res))
+    (case "FALSE" false
+          "time_out" (throw (TimeoutException. "evaluating the prediate timed out"))
+          "TRUE" true)))
 
 (defn -getWrittenVariables [ir]
   (let [parts (partition 2 (:id-vals ir))]
     (map first parts)))
 
 (defn -evaluateAction [statespace ir bindings]
+  ;; TODO: handle all possible substitutions
   (let [parts (partition 2 (:id-vals ir))
         ids (map first parts)
         vs (map second parts)]
@@ -101,6 +106,6 @@
   (.eval newstate (butil/ir->b (get-in preds ["take_off" "z_ran"])))
   preds
 
-  (-evaluatePredicate statespace (get-in preds ["take_off" "z_ran"]) {"z" "1", "TAKE_OFF_DIST" "2", "Z_RAN" "1..3"})
+  (-evaluatePredicate statespace (get-in preds ["take_off" "z_ran"]) {"z" "1", #_#_"TAKE_OFF_DIST" "2", "Z_RAN" "1..3"})
   (-evaluateAction statespace (get-in preds ["take_off" "estimante_z"]) {"z" "1", "TAKE_OFF_DIST" "2", "lisb__postsubst__z" "3"})
   )
