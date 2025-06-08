@@ -3,11 +3,12 @@
             [lisb.translation.eventb.util :as util]
             [lisb.translation.util :as butil]
             [lisb.translation.irtools :as irtools]
+            [lisb.translation.ir2ast]
             [lisb.translation.eventb.irtools :as irt])
   (:import [de.prob.animator.command FindStateCommand]
            [de.prob.animator.domainobjects ClassicalB]
            [de.prob.animator.domainobjects FormulaExpand]
-           [java.util.concurrent.TimeoutException])
+           [java.util.concurrent TimeoutException])
   (:gen-class
     :name de.hhu.stups.lisb.RodinPluginAdapter
     :methods [^{:static true} [getStateSpace [String] de.prob.statespace.StateSpace]
@@ -80,6 +81,10 @@
                         (apply butil/band (map (fn [id v] (butil/b= (keyword (str "lisb__postsubst__" (name id))) v)) ids vs))
                         bindings)))
 
+;; HACK: this should be moved to lisb (as probably most of the stuff above)
+(defmethod lisb.translation.ir2ast/ir-node->ast-node :theorem [ir-node]
+  (lisb.translation.ir2ast/ir-node->ast-node (:pred ir-node)))
+
 (comment
   (def statespace (-getStateSpace "/home/philipp/tmp/rodin/workspace/NewProject/Clock.bum"))
   (def ir (-getIR statespace "Clock"))
@@ -97,6 +102,7 @@
   ir
   (def preds (-getLabeledPredicates ir) )
   (-getOpenIdentifiers nil (get-in preds ["take_off" ""]))
+  (butil/ir->b (get-in preds ["INVARIANT" "type_emergency"]))
 
   (eval-formula' statespace (lisb.translation.util/ir->ast (lisb.translation.lisb2ir/b= :z 1)))
 
