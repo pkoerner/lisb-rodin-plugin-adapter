@@ -29,6 +29,9 @@
               ^{:static true} [evaluateAction [de.prob.statespace.StateSpace java.util.Map java.util.Map] java.util.Map]
               ;; IR + Variable Bindings -> Variable Bindings of next State
 
+              ^{:static true} [bexpr2ir [String] java.util.Map]
+              ^{:static true} [bpred2ir [String] java.util.Map]
+
                ]))
 
 (defn -getStateSpace [file]
@@ -83,6 +86,9 @@
     (-evaluatePredicate statespace
                         (apply butil/band (map (fn [id v] (butil/b= (keyword (str "lisb__postsubst__" (name id))) v)) ids vs))
                         bindings)))
+
+(defn -bexpr2ir [s] (butil/b-expression->ir s))
+(defn -bpred2ir [s] (butil/b-predicate->ir s))
 
 ;; HACK: this should be moved to lisb (as probably most of the stuff above)
 (defmethod lisb.translation.ir2ast/ir-node->ast-node :theorem [ir-node]
