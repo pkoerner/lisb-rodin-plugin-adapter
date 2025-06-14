@@ -56,15 +56,18 @@
   ;; TODO: this is basically the evaluation mechanism in lisb --- refactor!
   (let [formula (apply butil/band (map (fn [[id v]] (butil/b= (keyword id) (butil/b-expression->ir v))) bindings))
         formula-str (butil/ir->b formula)
-        ;_ (println formula-str)
+        ; _ (println formula-str)
         fsc (FindStateCommand. statespace (ClassicalB. (butil/b-predicate->ast formula-str) FormulaExpand/EXPAND "") false)
         _ (.execute statespace fsc)
         newstate (.getDestination (.getOperation fsc))
         ;; include bindings in solution for post-variables
+        ; _ (println (butil/ir->b (butil/band formula ir)))
         res (.eval newstate (butil/ir->b (butil/band formula ir)))
         res-val (.getValue res)]
+    ; (def res res)
     ;; TODO: handle res
-    (case "FALSE" false
+    (case res-val
+          "FALSE" false
           "time_out" (throw (TimeoutException. "evaluating the prediate timed out"))
           "TRUE" true)))
 
@@ -114,4 +117,13 @@
 
   (-evaluatePredicate statespace (get-in preds ["take_off" "z_ran"]) {"z" "1", #_#_"TAKE_OFF_DIST" "2", "Z_RAN" "1..3"})
   (-evaluateAction statespace (get-in preds ["take_off" "estimante_z"]) {"z" "1", "TAKE_OFF_DIST" "2", "lisb__postsubst__z" "3"})
+
+
+  (def statespace (-getStateSpace "/home/philipp/tmp/rodin/workspace/Counter/Counter.bum"))
+  (def ir (-getIR statespace "Counter"))
+  (def preds (-getLabeledPredicates ir))
+  (-evaluatePredicate statespace (get-in preds ["INVARIANT" "inv1"]) {"count" "150"})
+
+  res
   )
+
