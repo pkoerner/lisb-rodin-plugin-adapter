@@ -23,10 +23,10 @@
               ^{:static true} [getOpenIdentifiers [java.util.Map java.util.Map] java.util.List] 
               ;; IR + Predicate / Action -> List of variable names
 
-              ^{:static true} [evaluatePredicate [de.prob.statespace.StateSpace java.util.Map java.util.Map] Boolean]
+              ^{:static true} [evaluatePredicate [de.prob.statespace.StateSpace java.util.Map java.util.Map] de.prob.animator.domainobjects.EvalResult]
               ;; IR + Variable Bindings -> Boolean
 
-              ^{:static true} [evaluateAction [de.prob.statespace.StateSpace java.util.Map java.util.Map] Boolean]
+              ^{:static true} [evaluateAction [de.prob.statespace.StateSpace java.util.Map java.util.Map] de.prob.animator.domainobjects.EvalResult]
               ;; IR + Variable Bindings -> Variable Bindings of next State -> Boolean
 
               ^{:static true} [bexpr2ir [String] java.util.Map]
@@ -64,12 +64,11 @@
         _ (.execute statespace fsc)
         newstate (.getDestination (.getOperation fsc))
         ;; include bindings in solution for post-variables
-        ; _ (println (butil/ir->b (butil/band formula ir)))
+         _ (println (butil/ir->b (butil/band formula ir)))
         res (.eval newstate (butil/ir->b (butil/band formula ir)))
-        res-val (.getValue res)]
-    ; (def res res)
-    ;; TODO: handle res
-    (case res-val
+        #_#_res-val (.getValue res)]
+    res
+    #_(case res-val
           "FALSE" false
           "time_out" (throw (TimeoutException. "evaluating the prediate timed out"))
           "TRUE" true)))
@@ -128,8 +127,20 @@
   (def statespace (-getStateSpace "/home/philipp/tmp/rodin/workspace/Counter/Counter.bum"))
   (def ir (-getIR statespace "Counter"))
   (def preds (-getLabeledPredicates ir))
-  (-evaluatePredicate statespace (get-in preds ["INVARIANT" "inv1"]) {"count" "150"})
+  (-evaluatePredicate statespace (get-in preds ["INVARIANT" "inv1"]) {"count" "15", "lisb__postsubst__count" "16"})
 
+  res
+
+  (def statespace (-getStateSpace "/home/philipp/Downloads/Basic Modelling/Counter Machine.bum"))
+  (def ir (-getIR statespace "Counter Machine"))
+  (def preds (-getLabeledPredicates ir))
+  (def arg2 (get-in preds ["increment" "act1"]))
+  (def arg3 {"count" "15"})
+  arg2 ; =>  {:tag :assignment, :id-vals (:count {:tag :add, :nums (:count 1)})}
+  arg3 ; =>  {"count" "15"}
+  (-evaluateAction statespace arg2 arg3) ; =>  true
+  (-evaluateAction statespace (get-in preds ["increment" "act1"]) {"count" "15", "lisb__postsubst__count" "16"})
+  java.lang.Boolean
   res
   )
 
